@@ -1,65 +1,47 @@
-"""Script de validación: pregunta "¿Qué es la entropía?" en modo normal y en streaming.
+"""
+Script de validación.
+
+1. Carga las variables del archivo .env
+2. Pide elegir el proveedor por consola (OpenAI o Anthropic)
+3. Pregunta "¿Qué es la entropía?" en modo normal y en modo streaming
 
 Uso:
-    python main.py                      # usa LLM_PROVIDER del .env
-    python main.py --provider anthropic
+    python main.py
 """
 
-import argparse
 import asyncio
 
 from dotenv import load_dotenv
 
-from llm_client import AsyncLLMManager, ChatMessage, LLMError, Provider, Role
+from console import choose_provider
+from llm_runner import LLMRunner
 
-QUESTION = "¿Qué es la entropía? Respondé en un párrafo corto."
-
-
-async def run(provider: str | None) -> None:
-    messages = [
-        ChatMessage(role=Role.SYSTEM, content="Sos un profesor de física claro y conciso."),
-        ChatMessage(role=Role.USER, content=QUESTION),
-    ]
-
-    async with AsyncLLMManager.from_env(provider) as llm:
-        print(f"Proveedor: {llm.provider} | Modelo: {llm.model}\n")
-
-        print("=== Modo normal ===")
-        response = await llm.generate(messages)
-        if response.ok:
-            print(response.content)
-            if response.usage:
-                print(
-                    f"\n(tokens: {response.usage.input_tokens} entrada / "
-                    f"{response.usage.output_tokens} salida, fin: {response.finish_reason})"
-                )
-        else:
-            print(f"Error controlado: {response.error}")
-
-        print("\n=== Modo streaming ===")
-        async for chunk in llm.stream(messages):
-            if isinstance(chunk, LLMError):
-                print(f"\nError controlado: {chunk}")
-                break
-            print(chunk, end="", flush=True)
-        print()
+PROMPT = "¿Qué es la entropía? Respondé en un párrafo corto."
 
 
-def main() -> None:
+async def main() -> None:
+    # Carga las variables del archivo .env (API keys) en el entorno
     load_dotenv()
-    parser = argparse.ArgumentParser(description="Prueba del cliente LLM asíncrono.")
-    parser.add_argument(
-        "--provider",
-        choices=[p.value for p in Provider],
-        help="Sobrescribe LLM_PROVIDER del .env",
-    )
-    args = parser.parse_args()
+
+    provider = choose_provider()
+
     try:
-        asyncio.run(run(args.provider))
-    except ValueError as exc:
-        # Errores de configuración: MissingAPIKeyError o un LLM_PROVIDER inválido.
-        raise SystemExit(f"Error de configuración: {exc}") from None
+        runner = LLMRunner(provider=provider, prompt=PROMPT)
+    except ValueError as error:
+        # Errores de configuración: falta la API key, parámetros inválidos, etc.
+        print(f"\nError de configuración: {error}")
+        return
+
+    print(f"\nProveedor: {runner.provider} | Modelo: {runner.manager.model}\n")
+
+    try:
+        await runner.run_normal()
+        await runner.run_streaming()
+    finally:
+        # Cerramos la conexión aunque haya ocurrido un error
+        await runner.close()
 
 
 if __name__ == "__main__":
-    main()
+    # asyncio.run() es el punto de entrada: crea el event loop y ejecuta main()
+    asyncio.run(main())

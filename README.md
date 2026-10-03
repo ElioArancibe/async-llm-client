@@ -1,20 +1,35 @@
 # Unified Async LLM Client
 
-Cliente asíncrono unificado para **OpenAI** y **Anthropic** en Python 3.12: una única interfaz para generar respuestas completas o en streaming, con validación de entrada mediante Pydantic y manejo controlado de errores.
+Cliente asíncrono unificado para **OpenAI** y **Anthropic** en Python 3.12. Permite usar cualquiera de los dos proveedores con la misma interfaz, en modo normal o en streaming, con validación de datos mediante Pydantic y manejo de errores sin que el programa se rompa.
 
-## Estructura
+## Estructura del proyecto
 
 ```
 async-llm-client/
-├── llm_client/
-│   ├── schemas.py           # Modelos Pydantic: ChatMessage, ModelConfig, ModelResponse, LLMError
-│   ├── base.py              # BaseLLMClient (clase base abstracta) y captura de errores
-│   ├── openai_client.py     # OpenAIClient    (AsyncOpenAI)
-│   ├── anthropic_client.py  # AnthropicClient (AsyncAnthropic)
-│   └── manager.py           # AsyncLLMManager: elige el proveedor según la configuración
-├── main.py                  # Script de validación (modo normal + streaming)
+├── main.py                  # Script de validación: elige proveedor y prueba normal + streaming
+├── console.py               # Menú por consola para elegir el proveedor
+├── llm_runner.py            # LLMRunner: ejecuta un prompt con un proveedor y muestra el resultado
+├── llm_manager.py           # AsyncLLMManager: crea el cliente correcto (patrón Factory)
+├── config.py                # Lee las API keys y los modelos desde las variables de entorno
+├── schemas.py               # Esquemas Pydantic: ChatMessage, ModelConfig, ProviderSettings, ModelResponse
+├── clients/
+│   ├── base_client.py       # BaseLLMClient: clase base abstracta (interfaz común)
+│   ├── openai_client.py     # OpenAIClient: usa AsyncOpenAI
+│   └── anthropic_client.py  # AnthropicClient: usa AsyncAnthropic
 ├── requirements.txt
 └── .env.example
+```
+
+### Cómo se conectan las piezas
+
+```
+main.py
+  └─ console.choose_provider()          → el usuario elige "openai" o "anthropic"
+  └─ LLMRunner(provider, prompt)
+       └─ AsyncLLMManager(provider)
+            ├─ config.load_provider_settings()   → API key y modelo desde el .env
+            ├─ ModelConfig(...)                  → validación de parámetros con Pydantic
+            └─ OpenAIClient o AnthropicClient    → ambos heredan de BaseLLMClient
 ```
 
 ## Instalación
@@ -22,77 +37,83 @@ async-llm-client/
 Requiere **Python 3.12**.
 
 ```bash
-# Windows
-py -3.12 -m venv .venv
-.venv\Scripts\activate
+# 1. Crear el entorno virtual
+py -3.12 -m venv .venv            # Windows
+python3.12 -m venv .venv          # Linux / macOS
 
-# Linux / macOS
-python3.12 -m venv .venv
-source .venv/bin/activate
+# 2. Activarlo
+.venv\Scripts\activate            # Windows
+source .venv/bin/activate         # Linux / macOS
 
+# 3. Instalar las dependencias (openai, anthropic, pydantic, python-dotenv)
 pip install -r requirements.txt
 ```
 
 ## Variables de entorno
 
-Copiá `.env.example` como `.env` y completá los valores:
+Copiá `.env.example` como `.env` y completá tus claves:
 
 ```bash
-cp .env.example .env      # Windows: copy .env.example .env
+copy .env.example .env            # Windows
+cp .env.example .env              # Linux / macOS
 ```
 
-| Variable            | Obligatoria                        | Descripción                                          |
-| ------------------- | ---------------------------------- | ---------------------------------------------------- |
-| `LLM_PROVIDER`      | No (por defecto `openai`)          | Proveedor a usar: `openai` o `anthropic`             |
-| `OPENAI_API_KEY`    | Si el proveedor es `openai`        | Clave de API de OpenAI                               |
-| `ANTHROPIC_API_KEY` | Si el proveedor es `anthropic`     | Clave de API de Anthropic                            |
-| `OPENAI_MODEL`      | No (por defecto `gpt-5-mini`)      | Modelo de OpenAI a usar                              |
-| `ANTHROPIC_MODEL`   | No (por defecto `claude-opus-5-5`) | Modelo de Anthropic a usar                           |
+| Variable            | Obligatoria                         | Descripción                   |
+| ------------------- | ----------------------------------- | ----------------------------- |
+| `OPENAI_API_KEY`    | Si elegís OpenAI                    | Clave de API de OpenAI        |
+| `ANTHROPIC_API_KEY` | Si elegís Anthropic                 | Clave de API de Anthropic     |
+| `OPENAI_MODEL`      | No (por defecto `gpt-5-mini`)       | Modelo de OpenAI a usar       |
+| `ANTHROPIC_MODEL`   | No (por defecto `claude-opus-5-5`)  | Modelo de Anthropic a usar    |
 
-El archivo `.env` está en `.gitignore`: **nunca se sube al repositorio**.
+El proveedor **no** se configura en el `.env`: se elige por consola al ejecutar el programa.
+
+El archivo `.env` está en `.gitignore` y nunca se sube al repositorio.
 
 ## Ejecutar el script de prueba
 
 ```bash
-python main.py                        # usa LLM_PROVIDER del .env
-python main.py --provider anthropic   # fuerza un proveedor
+python main.py
 ```
 
-El script pregunta *"¿Qué es la entropía?"* dos veces: primero en modo normal, que imprime la respuesta completa y el uso de tokens, y después en modo streaming, que imprime el texto a medida que llega.
+El programa pregunta qué proveedor usar:
 
-## Uso como librería
-
-```python
-import asyncio
-from llm_client import AsyncLLMManager, ChatMessage, LLMError, ModelConfig, Role
-
-async def demo():
-    config = ModelConfig(max_tokens=2048)  # validado por Pydantic
-    messages = [ChatMessage(role=Role.USER, content="Hola")]
-
-    async with AsyncLLMManager("anthropic", config) as llm:
-        # Modo normal
-        response = await llm.generate(messages)
-        print(response.content if response.ok else response.error)
-
-        # Modo streaming
-        async for chunk in llm.stream(messages):
-            if isinstance(chunk, LLMError):
-                print("Error:", chunk)
-                break
-            print(chunk, end="", flush=True)
-
-asyncio.run(demo())
+```
+¿Qué proveedor querés usar?
+  1) OpenAI
+  2) Anthropic
+Elegí una opción (1 o 2): 1
 ```
 
-## Decisiones de diseño
+Después hace la pregunta *"¿Qué es la entropía?"* dos veces:
 
-- **Intercambiabilidad:** `OpenAIClient` y `AnthropicClient` heredan de `BaseLLMClient` y exponen los mismos métodos, `generate()` y `stream()`. `AsyncLLMManager` instancia uno u otro según `LLM_PROVIDER`.
-- **Asincronía:** se usan únicamente los clientes asíncronos de los SDKs (`AsyncOpenAI`, `AsyncAnthropic`) con `await`, así que ninguna llamada bloquea el event loop.
-- **Streaming:** `stream()` es un generador asíncrono que hace `yield` de cada fragmento de texto dentro de un `async for` sobre el stream del SDK.
-- **Validación:** `ChatMessage` valida el rol y que el contenido no esté vacío. `ModelConfig` valida `temperature` (de 0 a 2), `max_tokens` (> 0), `timeout` y `max_retries`.
-- **Manejo de errores:**
-  - **Durante una llamada:** las excepciones del SDK (clave inválida, rate limit, errores de red o timeouts, errores del servidor) se capturan y se convierten en un `LLMError` con `type`, `status_code` y `retryable`. `generate()` lo devuelve dentro de `ModelResponse.error` y `stream()` lo emite como último elemento. Ninguno de los dos lanza una excepción.
-  - **Reintentos:** los errores reintentables (429, 5xx, problemas de red) se reintentan automáticamente con backoff exponencial gracias a los SDKs. La cantidad se configura con `ModelConfig.max_retries`, por defecto 2.
-  - **Al crear el cliente:** una clave faltante es un error de configuración y se detecta en ese momento con `MissingAPIKeyError`.
-- **Temperatura:** solo se envía si se define en `ModelConfig`. Algunos modelos recientes, como la familia GPT-5 y Claude Opus 5.5, no aceptan valores personalizados. En ese caso la API responde con un error, que vuelve como `LLMError` de tipo `bad_request`.
+1. **Modo normal:** espera la respuesta completa y la muestra de una vez, junto con los tokens usados.
+2. **Modo streaming:** muestra el texto a medida que llega de la API.
+
+## Cómo se cumple cada requisito
+
+| Requisito | Dónde |
+| --- | --- |
+| Interfaz común para OpenAI y Anthropic | `BaseLLMClient` en `clients/base_client.py`. Los dos clientes heredan de ella y tienen los mismos métodos: `generate()`, `stream()` y `close()`. |
+| `AsyncLLMManager` que carga el proveedor según la configuración | `llm_manager.py` (patrón Factory). |
+| Llamadas no bloqueantes | Se usan `AsyncOpenAI` y `AsyncAnthropic` con `await`, y `asyncio.run()` como punto de entrada. |
+| Streaming con `yield` | El método `stream()` de cada cliente recorre el stream del SDK con `async for` y hace `yield` de cada fragmento. |
+| Validación con Pydantic | `schemas.py`: `ModelConfig` valida `temperature` (de 0 a 2), `max_tokens` (> 0), `timeout_seconds` y `max_retries`. `ChatMessage` valida el rol y que el contenido no esté vacío. |
+| Secretos protegidos | La API key se guarda como `SecretStr`, así que no aparece si se imprime la configuración. |
+| Errores de red y rate limit controlados | Cada cliente captura las excepciones del SDK y las traduce a un mensaje claro. Ver la sección siguiente. |
+
+### Manejo de errores
+
+- **Modo normal:** `generate()` nunca lanza una excepción por un error de la API. Devuelve un `ModelResponse` con `success=False` y el motivo en `error`.
+- **Modo streaming:** `stream()` termina con un último fragmento `[ERROR] ...`.
+- **Errores que se capturan:**
+  - API key inválida
+  - Límite de tasa o de cuota (429)
+  - Error de red
+  - Timeout: `asyncio.timeout()` corta la espera si el modelo tarda demasiado
+  - Cualquier otro error de la API
+- **Reintentos:** ante errores temporales (429, errores 5xx, fallas de red) los SDKs reintentan automáticamente con espera exponencial. La cantidad se configura con `max_retries` en `ModelConfig`.
+- **Errores de configuración:** si falta la API key, el programa lo avisa con un mensaje claro y termina sin traceback.
+
+### Nota sobre la temperatura
+
+`temperature` se valida entre 0 y 2, pero solo se envía a la API si se define. Algunos modelos recientes, como la familia GPT-5 de OpenAI y los Claude más nuevos, no aceptan una temperatura personalizada. Si se envía igual, la API responde con un error, que el programa muestra como mensaje controlado.
