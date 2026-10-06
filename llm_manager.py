@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator
 
 from clients.anthropic_client import AnthropicClient
 from clients.base_client import BaseLLMClient
+from clients.gemini_client import GeminiClient
 from clients.openai_client import OpenAIClient
 from config import load_provider_settings
 from schemas import ChatMessage, ModelConfig, ModelResponse, ProviderName, ProviderSettings
@@ -49,6 +50,9 @@ class AsyncLLMManager:
 
         if settings.provider == "anthropic":
             return AnthropicClient(api_key, config)
+
+        if settings.provider == "gemini":
+            return GeminiClient(api_key, config)
 
         raise ValueError(f"Proveedor no soportado: {settings.provider}")
 

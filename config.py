@@ -12,18 +12,21 @@ from schemas import ProviderName, ProviderSettings
 DEFAULT_MODELS = {
     "openai": "gpt-5-mini",
     "anthropic": "claude-opus-5-5",
+    "gemini": "gemini-3.8-flash",
 }
 
 # Nombre de la variable de entorno que tiene la API key de cada proveedor
 API_KEY_VARIABLES = {
     "openai": "OPENAI_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
+    "gemini": "GEMINI_API_KEY",
 }
 
 # Nombre de la variable de entorno (opcional) para cambiar el modelo
 MODEL_VARIABLES = {
     "openai": "OPENAI_MODEL",
     "anthropic": "ANTHROPIC_MODEL",
+    "gemini": "GEMINI_MODEL",
 }
 
 

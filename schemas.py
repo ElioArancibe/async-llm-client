@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, SecretStr
 
 # Los únicos proveedores válidos del proyecto.
 # Literal hace que Pydantic rechace cualquier otro texto.
-ProviderName = Literal["openai", "anthropic"]
+ProviderName = Literal["openai", "anthropic", "gemini"]
 
 
 class ChatMessage(BaseModel):

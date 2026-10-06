@@ -117,7 +117,11 @@ def describe_openai_error(error: Exception) -> str:
         return "API key inválida. Revisá OPENAI_API_KEY en el archivo .env."
 
     if isinstance(error, openai.RateLimitError):
-        return "Límite de tasa o de cuota excedido (error 429). Probá de nuevo más tarde."
+        # OpenAI usa el mismo error 429 para dos casos distintos:
+        # la cuenta se quedó sin crédito, o se hicieron demasiadas consultas seguidas.
+        if error.type == "insufficient_quota":
+            return "La cuenta de OpenAI no tiene crédito disponible (error 429). Cargá saldo en platform.openai.com."
+        return "Límite de tasa excedido (error 429): demasiadas consultas seguidas. Probá de nuevo más tarde."
 
     # APIConnectionError cubre errores de red (incluye el timeout del SDK)
     if isinstance(error, openai.APIConnectionError):

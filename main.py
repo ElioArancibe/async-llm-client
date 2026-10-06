@@ -13,20 +13,20 @@ import asyncio
 
 from dotenv import load_dotenv
 
-from console import choose_provider
+from console import choose_provider, get_console_prompt
 from llm_runner import LLMRunner
-
-PROMPT = "¿Qué es la entropía? Respondé en un párrafo corto."
-
 
 async def main() -> None:
     # Carga las variables del archivo .env (API keys) en el entorno
     load_dotenv()
 
+    # Elije el provedor por consola
     provider = choose_provider()
+    # Pregunta el prompt por consola
+    prompt = get_console_prompt()
 
     try:
-        runner = LLMRunner(provider=provider, prompt=PROMPT)
+        runner = LLMRunner(provider=provider, prompt=prompt)
     except ValueError as error:
         # Errores de configuración: falta la API key, parámetros inválidos, etc.
         print(f"\nError de configuración: {error}")
